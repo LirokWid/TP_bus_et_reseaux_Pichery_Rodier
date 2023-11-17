@@ -1,0 +1,86 @@
+import json
+from flask import Flask, jsonify, request, render_template
+
+app = Flask(__name__)
+
+welcome = "Welcome to 3ESE API! (RODIER & PICHERY)"
+
+@app.route('/')
+def hello_world():
+    return 'Hello, World!\n'
+
+@app.errorhandler(404)
+def page_not_found(error):
+    return render_template("page_not_found.html"), 404
+
+# Retrieve the entire sentence
+@app.route('/api/welcome/', methods=['GET'])
+def retrieve_sentence():
+    return jsonify({"message": welcome})
+
+# Retrieve a specific letter at position x
+@app.route('/api/welcome/<int:index>', methods=['GET'])
+def retrieve_letter(index):
+    if 0 <= index < len(welcome):
+        return jsonify({"letter": welcome[index]})
+    else:
+        return jsonify({"error": "Index out of range"}), 400  # Return a 400 Bad Request status
+
+# Create or change the sentence
+@app.route('/api/welcome/', methods=['POST'])
+def change_sentence():
+    global welcome
+    data = request.get_json()
+    if 'message' in data:
+        welcome = data['message']
+        return jsonify({"message": welcome})
+    else:
+        return jsonify({"error": "Invalid data"}), 400  # Return a 400 Bad Request status
+
+# Insert a new word at position x
+@app.route('/api/welcome/<int:index>', methods=['PUT'])
+def insert_word(index):
+    global welcome
+    data = request.get_json()
+    if 'word' in data:
+        word_to_insert = data['word']
+        if 0 <= index <= len(welcome):
+            welcome = welcome[:index] + word_to_insert + welcome[index:]
+            return jsonify({"message": welcome})
+        else:
+            return jsonify({"error": "Index out of range"}), 400  # Return a 400 Bad Request status
+    else:
+        return jsonify({"error": "Invalid data"}), 400  # Return a 400 Bad Request status
+
+# Change the letter at position x
+@app.route('/api/welcome/<int:index>', methods=['PATCH'])
+def change_letter(index):
+    global welcome
+    data = request.get_json()
+    if 'letter' in data:
+        new_letter = data['letter']
+        if 0 <= index < len(welcome):
+            welcome = welcome[:index] + new_letter + welcome[index + 1:]
+            return jsonify({"message": welcome})
+        else:
+            return jsonify({"error": "Index out of range"}), 400  # Return a 400 Bad Request status
+    else:
+        return jsonify({"error": "Invalid data"}), 400  # Return a 400 Bad Request status
+
+# Delete a letter at position x
+@app.route('/api/welcome/<int:index>', methods=['DELETE'])
+def delete_letter(index):
+    global welcome
+    if 0 <= index < len(welcome):
+        welcome = welcome[:index] + welcome[index + 1:]
+        return jsonify({"message": welcome})
+    else:
+        return jsonify({"error": "Index out of range"}), 400  # Return a 400 Bad Request status
+
+# Delete the entire sentence
+@app.route('/api/welcome/', methods=['DELETE'])
+def delete_sentence():
+    global welcome 
+    welcome = ""
+    return jsonify({"message": welcome})
+
