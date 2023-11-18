@@ -285,8 +285,9 @@ Une fois la commande reconnue la boucle `while(1)` du main va exécuter le code 
   }
   /* USER CODE END 3 */
 ```
-
-![RESUT_CONSOLLE](/img/port_com_uart.png)
+<p align="center">
+  <img src="img/port_com_uart.png">
+</p>
 
 
 ## TP2 - Interfacage STM32 - Raspberry Pi
@@ -345,12 +346,12 @@ Tableau des réponses :
 
 ## TP3 - Interface REST
 
-Dans ce TP, on va créer une API REST qui permettra de récupérer les données des capteurs de la carte STM32. Pour cela, on va utiliser le framework Flask.
+Dans ce TP, on va créer une API REST qui permettra de récupérer les données des capteurs de la carte STM32. Pour cela, on va utiliser le Framework Flask.
 
 
 ### Installation du serveur
 
-On isntalle les dépendances python dans le fichier requirements.txt puis on les installe avec la commande suivante :
+On installe les dépendances python dans le fichier requirements.txt puis on les installe avec la commande suivante :
 ```bash
 pip3 install -r requirements.txt
 ```
@@ -362,15 +363,15 @@ mkdir src
 cd src
 touch hello.py
 ```
-Pour lancer l'application flask, on utilise la commande suivante :
+Pour lancer l'application Flask, on utilise la commande suivante :
 ```bash
 FLASK_APP=hello.py FLASK_ENV=development flask run --debug --host 0.0.0.0
 ```
-Le serveur se lance ensuite et devient accessible depuis l'adresse IP de la raspberry pi sur le port 5000.
+Le serveur se lance ensuite et devient accessible depuis l'adresse IP de la Raspberry pi sur le port 5000.
 
 ![Alt text](img/flask.png)
 
-Dans le fichier hello.py (voir [hello.py.old](serveur/src/hello.py.old)), on définit les routes de l'api que l'on peut ensuite tester avec rested :
+Dans le fichier hello.py (voir [hello.py.old](serveur/src/hello.py.old)), on définit les routes de l'api que l'on peut ensuite tester avec Rested :
 
 ![Alt text](img/welcome_route.png)
 
@@ -387,42 +388,57 @@ On créé aussi [une page d'erreur 404](serveur/src/templates/page_not_found.htm
 
 ![Alt text](img/404.png)
 
+On rajoute ensuite d'autres routes pour modifier la phrase de bienvenue (fichier [hello.py.less.old](serveur/src/hello.py.less.old)) :
 
+On teste ensuite les routes avec Rested :
 
+Ici on récupère un caractère de la phrase de bienvenue à l'index 1 :
+![Alt text](img/getIndex.png)
+Ici on ajoute plusieurs caractères de la phrase de bienvenue à l'index 12 :
+![Alt text](img/putWord.png)
+![Alt text](img/putWord2.png)
+
+On peut voir côté serveur les différentes requêtes HTTP qui sont envoyées :
+![Alt text](img/serveurrequest.png)
 
 ## TP4 - Bus CAN
+
+![Alt text](img/partieCAN.png)
+
 Dans cette partie, on interface la carte STM32 avec un moteur pas à pas via le bus CAN. On utilise le protocole CAN pour communiquer avec un driver moteur qui permet de contrôler le moteur pas à pas.
 
 Pour contrôler le moteur, on créé des commande can permettant de faire tourner le moteur dans un sens ou dans l'autre.
 D'après la documentation du driver moteur, on peut envoyer les commandes suivantes :
 
-| Mode | Arbitration ID  | D0 | D1 | Description |
-| --- | --- | --- | --- | --- |
-| sens horaire | 0x201 | 0x00 | 0x00 | Le moteur tourne dans le sens horaire |
+| Arbitration ID  | D0 | D1 | Description |
+| --- | --- | --- | --- |
+| 0x61 | angle | 0x01 | Le moteur tourne dans le sens horaire avec un angle compris entre 0° et 180°|
+| 0x61 | angle | 0x00 | Le moteur tourne dans le sens anti-horaire avec un angle compris entre 0° et -180°|
 
 La fonction `set_motor_angle()` permet de faire tourner le moteur dans le sens horaire ou anti-horaire en fonction de la valeur de l'angle passé en paramètre :
-```c
+```C
 int set_motor_angle(int angle)
 {
 	uint8_t data[2];
 	uint32_t mailbox;
 	CAN_TxHeaderTypeDef header;
 	header.DLC 						= 2;
-	header.ExtId					= 0;//message ID extended
+	header.ExtId					= 0;			//message ID extended
 	header.IDE						= CAN_ID_STD; 	//Trame standard ou étendue
 	header.RTR						= CAN_RTR_DATA; //Trame n'est pas remote
 	header.StdId					= 0x61;			//Message ID
 	header.TransmitGlobalTime		= DISABLE;		//Message ID étendu
+	motor_angle += angle;
 	if ((angle>180)&&(angle<180))
 	{
 		return -1;
 	}else{
 		if(angle>=0)
 		{
-			data[1]=1;//sens trigo
+			data[1]=1;//sens anti-trigo
 			data[0]=abs(angle);
 		}else{
-			data[1]=0;//sens anti-trigo
+			data[1]=0;//sens trigo
 			data[0]=abs(angle);
 		}
 		  if (HAL_CAN_AddTxMessage(&hcan1, &header, data, &mailbox) != HAL_OK)
@@ -433,26 +449,50 @@ int set_motor_angle(int angle)
 		  return 0;
 	}
 }
-```	
+```
+à l'aide de la fonction `get_motor_angle()` on récupère la valeur de l'angle du moteur qui sera stocké dans une variable disponible pour l'API rest :
+```C
+int get_motor_angle()
+{
+	return motor_angle;
+}
+```
+On peut tester la communication CAN avec le driver moteur en envoyant des commandes qui font tourner le moteur dans un sens ou dans l'autre :
 
 
+![moteur](img/moteur_fonctionne.gif)
 
-![Alt text](image.png)
+On a ensuite relié les valeurs de température du capteur BMP280 à la valeur de l'angle du moteur pour faire tourner le moteur en fonction de la température.
+
+```C
+int set_motor_angle_temp(float temp)
+{
+	int angle = (int)temp;
+	return set_motor_angle(angle);
+}
+```
+
 
 ## TP5 - Intégration globale
-![Alt text](img/image-2.png)
 
-![Alt text](img/image-3.png)
+Pour finir ce projet, on intègre toutes les parties précédentes pour créer une application qui permet de récupérer les données des capteurs et du moteur et de les afficher avec des requêtes HTTP.
 
-![Alt text](img/image-4.png)
+On définit de nouvelles routes dans l'API Flask pour récupérer les données des capteurs et du moteur, dans le fichier [hello.py](serveur/src/hello.py) :
+| Route | Méthode | Description |
+| --- | --- | --- |
+| /api/temp | POST | Renvoie la dernière température acquise |
+| /api/temp | GET | Renvoie une liste de toute les températures enregistrées |
+| /api/temp/__X__ | GET | Renvoie une précédente température à l'index __X__ |
+| /api/temp/__X__| DELETE | Supprime une valeur de température à l'index __X__ |
+| /api/pres | POST | Renvoie la dernière pression acquise |
+| /api/pres | GET | Renvoie une liste de toute les pression enregistrées |
+| /api/pres/__X__ | GET | Renvoie une précédente pression à l'index __X__ |
+| /api/pres/__X__| DELETE | Supprime une valeur de pression à l'index __X__ |
+| /api/angle | GET | Renvoi la valeur de l'angle du moteur |
 
-![Alt text](img/image-5.png)
 
-![Alt text](img/image-6.png)
+On ajoute aussi les fonctions permettant de récupérer les données des capteurs et du moteur, on peut ensuite créer des requêtes HTTP pour récupérer les données des capteurs et du moteur.
 
+# Conclusion
 
-# ddsv
-## sdf
-#### efef
-
-fefe
+Nous avons réussi à créer une application qui permet de récupérer les données des capteurs et du moteur et de les afficher avec des requêtes HTTP, tout en utilisant les protocoles UART, I2C et CAN. Nous avons aussi appris à utiliser le Framework Flask pour créer une API REST en python. 
